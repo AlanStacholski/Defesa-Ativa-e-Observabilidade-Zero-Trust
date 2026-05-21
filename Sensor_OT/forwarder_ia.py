@@ -17,10 +17,16 @@ TEMPO_SUPRESSAO_SEGUNDOS = 60 # Só aciona a IA de novo após 60 segundos de sil
 def enviar_para_soc(fonte, relatorio):
     try:
         payload = {"source": fonte, "ai_report": relatorio}
-        requests.post(SOC_URL, json=payload)
-    except:
-        pass # Ignora erro caso o Java esteja desligado
-
+        # Adicionando o Token Zero-Trust no cabeçalho
+        headers = {"X-SOC-Token": "zt-token-secreto-2026"} 
+        
+        resposta = requests.post(SOC_URL, json=payload, headers=headers)
+        
+        if resposta.status_code == 401:
+            print("[-] Erro: O SOC rejeitou a conexão (Falha Zero-Trust).")
+    except Exception as e:
+        print(f"[-] Erro ao conectar ao Java: {e}")
+        
 def analisar_com_ia(sensor_id, payload_str):
     print(f"\n[!] NOVO INCIDENTE: Acionando IA para RCA do sensor {sensor_id}...")
     
