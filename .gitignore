@@ -1,0 +1,15 @@
+# Python
+Sensor_OT/venv/
+Sensor_OT/__pycache__/
+*.pyc
+
+# Java / Spring Boot
+zerotrust-soc/target/
+zerotrust-soc/.mvn/wrapper/maven-wrapper.jar
+!zerotrust-soc/.mvn/wrapper/maven-wrapper.properties
+*.class
+
+# IDEs
+.idea/
+.vscode/
+*.iml
