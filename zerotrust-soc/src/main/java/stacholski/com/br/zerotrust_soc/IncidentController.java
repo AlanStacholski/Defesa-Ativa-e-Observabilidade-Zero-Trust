@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -18,6 +19,13 @@ public class IncidentController {
 
     @Value("${soc.security.api-key}")
     private String validApiKey;
+
+    // --- NOVA ROTA: Retorna todos os incidentes salvos para o Dashboard Web ---
+    @GetMapping
+    public ResponseEntity<List<Incident>> getAllIncidents() {
+        // Retorna a lista de incidentes salvos no banco H2
+        return ResponseEntity.ok(repository.findAll());
+    }
 
     @PostMapping("/report")
     public ResponseEntity<Map<String, String>> receiveIncidentReport(
@@ -34,6 +42,7 @@ public class IncidentController {
         incident.setAiReport((String) payload.get("ai_report"));
         repository.save(incident);
 
+        // Limpa a tela do console Java
         System.out.print("\033[H\033[2J");  
         System.out.flush();
         System.out.println("==================================================");
@@ -41,15 +50,14 @@ public class IncidentController {
         System.out.println("==================================================");
         System.out.println("ID no Banco : " + incident.getId());
         System.out.println("Origem      : " + incident.getSource());
-        System.out.println("Relatório IA:\n" + incident.getAiReport());
-        System.out.println("==================================================");
+        System.out.println("==================================================\n");
 
-        // MOTOR SOAR: Resposta Automatizada
+        // Motor SOAR
         Map<String, String> responseBody = new HashMap<>();
         String upperReport = incident.getAiReport().toUpperCase();
         
         if (upperReport.contains("CRÍTICO") || upperReport.contains("CRITICAL")) {
-            System.out.println("[⚡] DECISÃO SOAR: Risco alto detectado. Emitindo ordem de SHUTDOWN.");
+            System.out.println("[⚡] DECISÃO SOAR: Risco alto detectado. Emitindo ordem de contenção.");
             responseBody.put("action", "SHUTDOWN");
             responseBody.put("target", incident.getSource());
         } else {

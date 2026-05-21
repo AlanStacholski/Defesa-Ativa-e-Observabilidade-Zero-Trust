@@ -3,18 +3,17 @@ import requests
 import json
 import time
 
-# Configurações
+# Configurações XDR
 BROKER = "broker.hivemq.com"
 PORT = 1883
-TOPIC = "stacholski/industria/sensor/caldeira_01"
+TOPIC = "stacholski/#" # <-- Escuta TODAS as redes (IT e OT)
 OLLAMA_URL = "http://localhost:11434/api/generate"
 SOC_URL = "http://localhost:8080/api/v1/incidents/report"
 
-# Memória de estado para Supressão de Alertas (Alert Suppression)
 ultimo_alerta_ia = {}
-TEMPO_SUPRESSAO_SEGUNDOS = 60 # Só aciona a IA de novo após 60 segundos de silêncio
+TEMPO_SUPRESSAO_SEGUNDOS = 60 
 
-def enviar_para_soc(fonte, relatorio):
+def enviar_para_soc(fonte, relatorio, tipo_ambiente):
     try:
         payload = {"source": fonte, "ai_report": relatorio}
         headers = {"X-SOC-Token": "zt-token-secreto-2026"} 
@@ -23,24 +22,38 @@ def enviar_para_soc(fonte, relatorio):
         
         if resposta.status_code == 200:
             dados_soc = resposta.json()
+            
+            # Se o SOAR (Java) autorizou a ação de contenção
             if dados_soc.get("action") == "SHUTDOWN":
-                print(f"[⚡] Ordem de contenção recebida do Java! Desligando {fonte}...")
-                topico_alvo = f"stacholski/industria/comando/{fonte}"
-                client.publish(topico_alvo, "SHUTDOWN")
+                if tipo_ambiente == "IT":
+                    print(f"[⚡] Ordem de contenção! Isolando endpoint Windows ({fonte}) da rede...")
+                    topico_alvo = f"stacholski/it/comando/{fonte}"
+                    comando = "ISOLATE_NETWORK"
+                else:
+                    print(f"[⚡] Ordem de contenção! Desligando máquina industrial ({fonte})...")
+                    topico_alvo = f"stacholski/industria/comando/{fonte}"
+                    comando = "SHUTDOWN"
+                    
+                client.publish(topico_alvo, comando)
+                
         elif resposta.status_code == 401:
             print("[-] Erro: O SOC rejeitou a conexão (Falha Zero-Trust).")
     except Exception as e:
         print(f"[-] Erro ao conectar ao Java: {e}")
 
-def analisar_com_ia(sensor_id, payload_str):
-    print(f"\n[!] NOVO INCIDENTE: Acionando IA para RCA do sensor {sensor_id}...")
+def analisar_com_ia(sensor_id, payload_str, tipo_ambiente):
+    print(f"\n[!] INCIDENTE {tipo_ambiente}: Acionando IA para RCA do ativo {sensor_id}...")
     
-    # Prompt reduzido e direto ao ponto = Resposta MUITO mais rápida
     prompt = f"""
-    Análise de anomalia OT. Responda APENAS com 3 linhas curtas, sem introdução:
-    1. Gravidade:
-    2. Técnica MITRE ICS:
+    Você é um analista de SOC. Classifique a ameaça abaixo. 
+    Se for telemetria OT (pressão/temperatura), mapeie no MITRE ICS. 
+    Se for log IT (Windows/Sysmon), mapeie no MITRE Enterprise.
+    
+    Responda APENAS com 3 linhas curtas:
+    1. Gravidade: CRÍTICO
+    2. Técnica MITRE:
     3. Ação de Contenção:
+    
     Dados: {payload_str}
     """
 
@@ -59,51 +72,48 @@ def analisar_com_ia(sensor_id, payload_str):
                     relatorio_completo += pedaco_texto
             
             print("\n" + "-" * 50)
-            
-            # Envia para o Java
-            enviar_para_soc(sensor_id, relatorio_completo)
+            enviar_para_soc(sensor_id, relatorio_completo, tipo_ambiente)
             print("[+] Relatório enviado ao SOC Central.")
     except Exception as e:
         print(f"\n[-] Erro IA: {e}")
 
 def on_message(client, userdata, msg):
     payload_str = msg.payload.decode('utf-8')
+    
     try:
         dados = json.loads(payload_str)
         status = dados.get("status")
         sensor_id = dados.get("sensor_id")
+        
+        # Identifica o tipo de ataque pelas regras de detecção
+        eh_ataque_ot = (status == "CRITICAL_OVERHEAT")
+        eh_ataque_it = (status == "SUSPICIOUS_ACTIVITY")
 
-        if status == "CRITICAL_OVERHEAT":
+        if eh_ataque_ot or eh_ataque_it:
+            tipo_ambiente = "IT" if eh_ataque_it else "OT"
             tempo_atual = time.time()
             
-            # Lógica de Prevenção de Fadiga de Alertas
+            # Prevenção de fadiga (silenciosa)
             if sensor_id in ultimo_alerta_ia:
-                tempo_passado = tempo_atual - ultimo_alerta_ia[sensor_id]
-                if tempo_passado < TEMPO_SUPRESSAO_SEGUNDOS:
-                    # Falha persiste, mas ainda está no tempo de supressão. Não aciona IA.
-                    print(f"[*] {sensor_id} continua em estado crítico. (Alerta suprimido).")
-                    
-                    # Opcional: Manda um ping pro Java saber que ainda tá pegando fogo
-                    enviar_para_soc(sensor_id, "STATUS PERSISTENTE: Anomalia continua ocorrendo, ação imediata ainda requerida.")
-                    return
-            
-            # Se for alerta novo (ou já passou do tempo), aciona a IA
+                if (tempo_atual - ultimo_alerta_ia[sensor_id]) < TEMPO_SUPRESSAO_SEGUNDOS:
+                    return 
+
             ultimo_alerta_ia[sensor_id] = tempo_atual
-            analisar_com_ia(sensor_id, payload_str)
+            analisar_com_ia(sensor_id, payload_str, tipo_ambiente)
 
     except json.JSONDecodeError:
         pass
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print("[+] Forwarder conectado. Escutando rede OT...")
+        print("[+] Forwarder XDR conectado. Escutando redes corporativas (IT) e industriais (OT)...")
         client.subscribe(TOPIC)
 
-client = mqtt.Client("Forwarder_SecOps_Local")
+client = mqtt.Client("Forwarder_XDR_SecOps")
 client.on_connect = on_connect
 client.on_message = on_message
 
-print("[*] Iniciando Cão de Guarda (Com Supressão de Alertas)...")
+print("[*] Iniciando Cérebro XDR (Cross-Layer Detection and Response)...")
 client.connect(BROKER, PORT, 60)
 
 try:
