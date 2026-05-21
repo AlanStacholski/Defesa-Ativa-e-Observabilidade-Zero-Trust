@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -19,37 +20,42 @@ public class IncidentController {
     private String validApiKey;
 
     @PostMapping("/report")
-    public ResponseEntity<String> receiveIncidentReport(
+    public ResponseEntity<Map<String, String>> receiveIncidentReport(
             @RequestHeader(value = "X-SOC-Token", required = false) String providedToken,
             @RequestBody Map<String, Object> payload) {
 
-        // 1. BARREIRA ZERO-TRUST (Autenticação)
         if (providedToken == null || !providedToken.equals(validApiKey)) {
-            System.out.println("\n[!] TENTATIVA DE INVASÃO BLOQUEADA: Token inválido ou ausente.");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Acesso Negado: Falha de Identidade Zero-Trust.");
+            System.out.println("\n[!] TENTATIVA DE INVASÃO BLOQUEADA: Falha Zero-Trust.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        // 2. PERSISTÊNCIA (Salvar no Banco)
         Incident incident = new Incident();
         incident.setSource((String) payload.get("source"));
         incident.setAiReport((String) payload.get("ai_report"));
         repository.save(incident);
 
-        // 3. LIMPEZA E FORMATAÇÃO DO TERMINAL (Limpa a tela usando ANSI)
         System.out.print("\033[H\033[2J");  
         System.out.flush();
-        
         System.out.println("==================================================");
         System.out.println(" 🚨 ALERTA CRÍTICO REGISTRADO NO SOC CENTRAL 🚨 ");
         System.out.println("==================================================");
         System.out.println("ID no Banco : " + incident.getId());
-        System.out.println("Data/Hora   : " + incident.getTimestamp());
         System.out.println("Origem      : " + incident.getSource());
-        System.out.println("--------------------------------------------------");
-        System.out.println("RELATÓRIO DA IA (Llama 3.2):");
-        System.out.println(incident.getAiReport());
-        System.out.println("==================================================\n");
+        System.out.println("Relatório IA:\n" + incident.getAiReport());
+        System.out.println("==================================================");
 
-        return ResponseEntity.ok("Incidente salvo e auditado no banco de dados.");
+        // MOTOR SOAR: Resposta Automatizada
+        Map<String, String> responseBody = new HashMap<>();
+        String upperReport = incident.getAiReport().toUpperCase();
+        
+        if (upperReport.contains("CRÍTICO") || upperReport.contains("CRITICAL")) {
+            System.out.println("[⚡] DECISÃO SOAR: Risco alto detectado. Emitindo ordem de SHUTDOWN.");
+            responseBody.put("action", "SHUTDOWN");
+            responseBody.put("target", incident.getSource());
+        } else {
+            responseBody.put("action", "LOG_ONLY");
+        }
+
+        return ResponseEntity.ok(responseBody);
     }
 }
