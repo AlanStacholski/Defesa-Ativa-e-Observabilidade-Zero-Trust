@@ -3,7 +3,7 @@
 # ==============================================================================
 Clear-Host
 Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host " 🚀 INICIANDO PIPELINE DE ATUALIZAÇÃO PLATAFORMA " -ForegroundColor Cyan
+Write-Host " PIPELINE DE ATUALIZAÇÃO PLATAFORMA " -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 
 # 1. Carrega as variáveis do arquivo .env para o script saber a branch alvo
@@ -47,7 +47,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # 5. Validação de Sucesso
 Write-Host "`n==================================================" -ForegroundColor Green
-Write-Host " 🎉 INFRAESTRUTURA ATUALIZADA E ONLINE! " -ForegroundColor Green
+Write-Host " INFRAESTRUTURA ATUALIZADA E ONLINE! " -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
 Write-Host "-> Dashboard SOC : http://localhost:$env:PORT_JAVA_BACKEND" -ForegroundColor White
 Write-Host "-> Prometheus    : http://localhost:$env:PORT_PROMETHEUS" -ForegroundColor White
