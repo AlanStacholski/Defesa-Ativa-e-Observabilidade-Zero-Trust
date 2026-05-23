@@ -4,7 +4,7 @@ import random
 import threading
 import paho.mqtt.client as mqtt
 
-BROKER = "broker.hivemq.com"
+BROKER = "localhost"
 PORT = 1883
 
 class EndpointWindows(threading.Thread):

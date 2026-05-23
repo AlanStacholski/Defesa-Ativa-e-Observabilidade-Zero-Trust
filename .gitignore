@@ -1,15 +1,35 @@
-# Python
-Sensor_OT/venv/
-Sensor_OT/__pycache__/
-*.pyc
+﻿# ==========================================
+# ZERO-TRUST PLATFORM - .GITIGNORE
+# ==========================================
 
-# Java / Spring Boot
-zerotrust-soc/target/
-zerotrust-soc/.mvn/wrapper/maven-wrapper.jar
-!zerotrust-soc/.mvn/wrapper/maven-wrapper.properties
+# 1. Segredos e Variáveis (CRÍTICO)
+.env
+*.env
+!.env.example
+
+# 2. Python / Sensores OT e IT
+venv/
+__pycache__/
+*.py[cod]
 *.class
 
-# IDEs
+# 3. Java / Spring Boot (SOC Central)
+target/
+*.class
+*.log
+.mvn/wrapper/maven-wrapper.jar
+
+# 4. Bancos de Dados e Volumes Docker
+mosquitto/data/
+mosquitto/log/
+data/
+soc_db.mv.db
+soc_db.trace.db
+*.db
+
+# 5. Sistema Operacional e IDEs
 .idea/
 .vscode/
 *.iml
+.DS_Store
+Thumbs.db

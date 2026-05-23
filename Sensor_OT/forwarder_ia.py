@@ -2,14 +2,15 @@ import paho.mqtt.client as mqtt
 import requests
 import json
 import time
+import os
 
-# Configurações XDR
-BROKER = "broker.hivemq.com"
+# Configurações XDR adaptáveis para Docker ou Local
+BROKER = os.getenv("MQTT_BROKER", "localhost")
 PORT = 1883
-TOPIC = "stacholski/#" # <-- Escuta TODAS as redes (IT e OT)
-OLLAMA_URL = "http://localhost:11434/api/generate"
-SOC_URL = "http://localhost:8080/api/v1/incidents/report"
-
+TOPIC = "stacholski/#"
+# host.docker.internal permite que o container Python aceda ao Ollama que está a correr no Windows Host
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434/api/generate")
+SOC_URL = os.getenv("SOC_URL", "http://localhost:8080/api/v1/incidents/report")
 ultimo_alerta_ia = {}
 TEMPO_SUPRESSAO_SEGUNDOS = 60 
 
@@ -114,7 +115,21 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 print("[*] Iniciando Cérebro XDR (Cross-Layer Detection and Response)...")
-client.connect(BROKER, PORT, 60)
+
+conectado = False
+while not conectado:
+    try:
+        client.connect(BROKER, PORT, 60)
+        conectado = True
+    except ConnectionRefusedError:
+        print("[-] Broker MQTT ainda não está pronto. Tentando novamente em 3 segundos...")
+        time.sleep(3)
+# ---------------------------------------
+
+try:
+    client.loop_forever()
+except KeyboardInterrupt:
+    client.disconnect()
 
 try:
     client.loop_forever()

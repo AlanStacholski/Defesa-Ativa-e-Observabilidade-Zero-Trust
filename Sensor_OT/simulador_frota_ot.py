@@ -5,7 +5,7 @@ import threading
 import sys
 import paho.mqtt.client as mqtt
 
-BROKER = "broker.hivemq.com"
+BROKER = "localhost"
 PORT = 1883
 
 class SensorIndustrial(threading.Thread):

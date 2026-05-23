@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'spring-boot-soc'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['zerotrust-soc:8080'] # Aponta para o serviço do Java no Docker

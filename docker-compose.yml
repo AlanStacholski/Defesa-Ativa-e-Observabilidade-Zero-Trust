@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # 1. Broker MQTT Privado
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: xdr-mqtt-broker
+    ports:
+      - "${PORT_MQTT_BROKER}:1883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  # 2. SOC Central & SOAR Engine (Java)
+  zerotrust-soc:
+    build: ./zerotrust-soc
+    container_name: zerotrust-soc-backend
+    ports:
+      - "${PORT_JAVA_BACKEND}:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=${SPRING_DB_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DB_PASSWORD}
+      - SOC_SECURITY_API_KEY=${SOC_SECURITY_TOKEN}
+    volumes:
+      - java_data:/app/data
+    depends_on:
+      - mosquitto
+
+  # 3. Cão de Guarda XDR (Python Forwarder)
+  xdr-forwarder:
+    build: ./Sensor_OT
+    container_name: xdr-forwarder-agent
+    environment:
+      - MQTT_BROKER=mosquitto
+      - SOC_URL=http://zerotrust-soc:8080/api/v1/incidents/report
+      - OLLAMA_URL=http://host.docker.internal:11434/api/generate
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mosquitto
+      - zerotrust-soc
+
+  # 4. Banco de Métricas (Prometheus)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: soc-prometheus
+    ports:
+      - "${PORT_PROMETHEUS}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - zerotrust-soc
+
+  # 5. Painel de Gráficos (Grafana)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: soc-grafana
+    ports:
+      - "${PORT_GRAFANA}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  java_data:
