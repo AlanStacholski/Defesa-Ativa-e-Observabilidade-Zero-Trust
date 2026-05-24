@@ -1,78 +1,65 @@
-# Plataforma de Defesa Ativa e Observabilidade Zero-Trust (IT/OT Convergence)
+# Active Defense & Zero-Trust Observability Platform (IT/OT Convergence)
 
-Uma plataforma integrada de cibersegurança híbrida baseada em arquitetura orientada a eventos (EDA). O sistema intercepta telemetria industrial (tecnologia operacional - OT) e logs de endpoints corporativos (tecnologia da informação - IT), realiza a Análise de Causa Raiz (RCA) na borda utilizando Inteligência Artificial Local (LLM) e orquestra a mitigação automática de ameaças através de um motor SOAR integrado a um backend robusto Java com validação de identidade Zero-Trust.
+An integrated cybersecurity platform based on Event-Driven Architecture (EDA). The system monitors industrial telemetry (OT) and corporate endpoints (IT) in real-time. It performs edge Root Cause Analysis (RCA) using local Large Language Models (LLMs) and orchestrates automated threat mitigation through a SOAR engine, integrated with a Java backend enforced by Zero-Trust validation.
 
-## 🛠️ Arquitetura do Ecossistema
+## Ecosystem Architecture
 
-1. **Chão de Fábrica e Endpoints (Simuladores Multi-threaded):** Scripts simulando redes corporativas compostas por múltiplos dispositivos gerando tráfego legítimo e logs comportamentais em tempo real (telemetria de sensores industriais e logs de criação de processos Microsoft Windows Sysmon).
-2. **Cão de Guarda XDR (Python Forwarder):** Agente de detecção cruzada que monitora barramentos de rede (MQTT Client utilizando tópicos curinga `stacholski/#`), identifica anomalias de segurança e consome modelos locais de linguagem.
-3. **Mapeamento de Ameaças (Ollama / Llama 3.2):** Inferência local privada de RAG para triagem rápida e classificação de táticas e técnicas alinhadas às matrizes corporativas e industriais (MITRE ATT&CK Enterprise e MITRE ATT&CK for ICS).
-4. **SOC Central e SOAR (Java Spring Boot API):** Backend corporativo seguro protegendo endpoints de ingestão através de barreira criptográfica (`X-SOC-Token`), persistindo trilhas de auditoria imutáveis (Banco H2 Relacional) e executando tomadas de decisão automática para contenção e isolamento de rede.
-5. **Painel de Operações (Dashboard Web):** Interface responsiva em Dark-mode atualizada dinamicamente (polling assíncrono via Fetch API) para visualização e acompanhamento de incidentes em tempo real.
+1. **Windows EDR Agent (NGAV & Leviathan DNA):** A real-time endpoint agent running on Windows. It utilizes process monitoring and File Integrity Monitoring (FIM) to detect ransomware, extract executable hashes, and profile malicious behavior (such as obfuscated PowerShell payloads and DNS reconnaissance) without relying solely on static signatures.
+2. **XDR Forwarder (Docker Ecosystem):** A containerized cross-detection agent that monitors MQTT network buses. It identifies security anomalies, enforces immediate network containment, and acts as a bridge to the AI engine.
+3. **Asynchronous Threat Mapping (Ollama / Llama 3.2):** Local, private inference engine. It is executed in a parallel thread by the XDR Forwarder to ensure the AI's processing time does not create latency in the incident containment pipeline. It maps tactics to the MITRE ATT&CK frameworks.
+4. **Central SOC and SOAR (Java Spring Boot API):** Corporate backend protecting data ingestion through a strict cryptographic barrier. It persists immutable audit trails in a relational database (H2) and handles automated isolation commands.
+5. **Operations Dashboard (Web UI):** Responsive interface updated dynamically via asynchronous polling for real-time incident visualization.
 
----
+## Prerequisites for Local Execution
 
-## 📋 Pré-requisitos para Execução Local
+To provision the environment, ensure the following components are installed:
 
-Para provisionar o ambiente na sua máquina de desenvolvimento, garanta que os seguintes componentes estejam instalados:
+* **Operating System:** Windows 10 / 11 (for the EDR Agent)
+* **Containerization:** Docker Desktop (Docker Compose)
+* **Java Environment:** Amazon Corretto JDK 21
+* **Python Environment:** Python 3.10 or higher
+* **AI Environment:** Ollama Client for Windows
 
-* **Sistemas Operacionais:** Windows 10 / 11
-* **Ambiente Java:** Amazon Corretto JDK 21 (Variáveis de ambiente `JAVA_HOME` mapeadas)
-* **Ambiente Python:** Python 3.10 ou superior
-* **Ambiente IA:** Ollama Client para Windows
+## How to Run the Platform
 
----
+Follow the sequence below to initialize the distinct architectural layers:
 
-## 🚀 Como Rodar a Plataforma de Forma Simples
-
-Siga as instruções abaixo abrindo terminais PowerShell separados para cada componente do ecossistema:
-
-### 1. Inicialização do Motor de IA Local
-Certifique-se de que o serviço em segundo plano do Ollama está em execução perto do relógio do sistema e execute o download inicial do modelo compacto de alto desempenho:
+### 1. Local AI Engine Initialization
+Ensure the Ollama background service is running and start the local model:
 ```powershell
 ollama run llama3.2
 ```
-*(Você pode fechar o prompt interativo digitando `/bye` assim que carregar).*
+*(Close the interactive prompt by typing `/bye` once the model is loaded into memory).*
 
-### 2. Inicialização do SOC Central & SOAR (Backend Java)
-Navegue até o diretório do projeto backend e execute o servidor web embarcado através do Maven Wrapper nativo:
+### 2. Infrastructure & SOC Initialization (Docker & Java)
+Start the complete containerized infrastructure (MQTT Broker, XDR Forwarder) and the Java Backend:
 ```powershell
+# For the Docker ecosystem
+docker-compose up --build -d
+
+# For the Java Backend
 cd "C:\Projetos\Plataforma de Defesa Ativa e Observabilidade Zero-Trust\zerotrust-soc"
 .\mvnw spring-boot:run
 ```
-O console exibirá o banner do Spring indicando que a API está ativa em `http://localhost:8080` e que o banco relacional local `soc_db` foi provisionado na raiz da aplicação.
+The API and Dashboard will be available at `http://localhost:8080`.
 
-### 3. Configuração do Ambiente de Sensores (Python Venv)
-Navegue até a pasta de scripts de detecção e configure as dependências isoladas:
+### 3. EDR Agent Setup (Windows Endpoint)
+Navigate to the sensor directory and configure the Python virtual environment:
 ```powershell
 cd "C:\Projetos\Plataforma de Defesa Ativa e Observabilidade Zero-Trust\Sensor_OT"
 python -m venv venv
 .\venv\Scripts\Activate
-pip install paho-mqtt==1.6.1 requests
+pip install psutil watchdog paho-mqtt==1.6.1 requests wmi
 ```
 
-### 4. Inicialização do Cão de Guarda XDR
-Com o ambiente virtual `(venv)` ativo no terminal, inicialize o agente de monitoramento cruzado:
+### 4. EDR Execution and Threat Simulation
+With the virtual environment active, start the endpoint agent:
 ```powershell
-python forwarder_ia.py
+python agente_edr_real.py
 ```
+To validate the behavioral detection pipeline, open a separate PowerShell terminal and execute an obfuscated payload or a file manipulation test inside the honeypot directory. The containment logic and the AI root cause analysis will be reflected automatically on the SOC dashboard.
 
-### 5. Execução dos Testes e Simulações de Carga (Ataque Simultâneo)
-Abra novos terminais na pasta de sensores, ative o ambiente virtual (`.\venv\Scripts\Activate`) e execute os simuladores de frota para ver a orquestração defensiva isolando as máquinas infectadas de forma automatizada:
+## Applied Zero-Trust Security Policies
 
-* **Para simular a Fábrica Industrial (5 Caldeiras com surto crítico na Caldeira 03):**
-  ```powershell
-  python simulador_frota_ot.py
-  ```
-* **Para simular o Escritório Corporativo (15 Máquinas Windows com injeção de payload no WIN-DESKTOP-07):**
-  ```powershell
-  python simulador_frota_it.py
-  ```
-
-Acesse **`http://localhost:8080`** no seu navegador para assistir às contenções automáticas sendo consolidadas no painel do SOC.
-
----
-
-## 🔒 Políticas de Segurança Zero-Trust Aplicadas
-* **Autenticação Baseada em Token de Dispositivo:** O cabeçalho das requisições REST obrigatoriamente valida a presença do hash de autenticação `X-SOC-Token: zt-token-secreto-2026`. Requisições não autenticadas ou com tokens fraudados sofrem drop imediato (`HTTP 401 Unauthorized`) impedindo ataques de injeção e spoofing de falsos alertas contra o SOC.
-* **Prevenção de Fadiga de Alertas (Alert Suppression):** O agente XDR possui lógica de estado para controle de debounce de rede. Se um ativo comprometido continuar gerando alertas redundantes consecutivos, o forwarder suprime o acionamento repetitivo da IA e o envio de requisições POST, protegendo o pipeline de processamento do backend contra negação de serviço interna (DDoS).
+* **Strict Header Authentication:** The REST API strictly validates the presence of the custom header `X-SOC-Token`. Unauthenticated requests suffer an immediate drop (HTTP 401 Unauthorized), preventing data injection or alert spoofing.
+* **Alert Fatigue Prevention:** The XDR agent implements debounce logic. Consecutive redundant alerts from the same compromised asset are suppressed, protecting the backend's processing pipeline and the AI engine from internal Denial of Service conditions.
